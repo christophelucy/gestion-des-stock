@@ -10676,11 +10676,11 @@ function drawQR() {
     grid.appendChild(card);
     try {
       new QRCode(qrDiv, {
-        text: 'BS:' + a.nom,
-        width: 140, height: 140,
+        text: 'BS:' + a.id,
+        width: 150, height: 150,
         colorDark: '#000000',
         colorLight: '#ffffff',
-        correctLevel: QRCode.CorrectLevel.H
+        correctLevel: QRCode.CorrectLevel.L
       });
     } catch(e) { qrDiv.textContent = 'Erreur QR'; }
   });
@@ -10757,17 +10757,14 @@ function scanLoop() {
 }
 
 function handleQR(val) {
-  // Format attendu : "BS:Nom de l'article"
   if (val.indexOf('BS:') !== 0) {
     requestAnimationFrame(scanLoop);
     return;
   }
-  var nom = val.substring(3);
-  var art = arts.find(function(a) { return a.nom === nom; });
-  if (!art) {
-    requestAnimationFrame(scanLoop);
-    return;
-  }
+  var id = parseInt(val.substring(3));
+  if (isNaN(id)) { requestAnimationFrame(scanLoop); return; }
+  var art = arts.find(function(a) { return a.id === id; });
+  if (!art) { requestAnimationFrame(scanLoop); return; }
   showResult(art);
 }
 
