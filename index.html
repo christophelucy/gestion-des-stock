@@ -10680,28 +10680,46 @@ function exportCmd() {
   var oldText = btn ? btn.innerHTML : '';
   if (btn) { btn.innerHTML = '⏳ Génération en cours...'; btn.disabled = true; }
 
-  // Utiliser GET + paramètre pour éviter CORS
-  var url = APPS_SCRIPT_URL + '?action=generer&stocks=' + encodeURIComponent(JSON.stringify(stocks));
+  // JSONP : seule technique qui bypass CORS avec Apps Script
+  var callbackName = 'appsCallback_' + Date.now();
+  
+  window[callbackName] = function(data) {
+    // Nettoyer
+    delete window[callbackName];
+    var tag = document.getElementById('jsonp-script');
+    if (tag) tag.parentNode.removeChild(tag);
+    if (btn) { btn.innerHTML = oldText; btn.disabled = false; }
+    if (data && data.status === 'ok') {
+      window.open(data.url, '_blank');
+      showOK('Bon de commande généré ✅', "La feuille Google Sheets a été mise à jour et va s'ouvrir dans un nouvel onglet.");
+    } else {
+      alert('Erreur : ' + (data ? data.message : 'inconnue'));
+    }
+  };
+
+  var url = APPS_SCRIPT_URL
+    + '?action=generer'
+    + '&callback=' + callbackName
+    + '&stocks=' + encodeURIComponent(JSON.stringify(stocks));
 
   var script = document.createElement('script');
+  script.id = 'jsonp-script';
+  script.src = url;
+  script.onerror = function() {
+    delete window[callbackName];
+    if (btn) { btn.innerHTML = oldText; btn.disabled = false; }
+    alert('Erreur de connexion avec Google Apps Script.');
+  };
+  document.body.appendChild(script);
   
-  // Utiliser fetch en mode no-cors n'est pas possible pour lire la réponse
-  // On utilise donc fetch normal avec GET
-  fetch(url)
-  .then(function(r) { return r.json(); })
-  .then(function(data) {
-    if (btn) { btn.innerHTML = oldText; btn.disabled = false; }
-    if (data.status === 'ok') {
-      window.open(data.url, '_blank');
-      showOK('Bon de commande généré ✅', 'La feuille Google Sheets a été mise à jour et va s'ouvrir dans un nouvel onglet.');
-    } else {
-      alert('Erreur : ' + (data.message || 'inconnue'));
+  // Timeout sécurité
+  setTimeout(function() {
+    if (window[callbackName]) {
+      delete window[callbackName];
+      if (btn) { btn.innerHTML = oldText; btn.disabled = false; }
+      alert('Délai dépassé. Vérifiez votre connexion internet.');
     }
-  })
-  .catch(function(err) {
-    if (btn) { btn.innerHTML = oldText; btn.disabled = false; }
-    alert('Erreur : ' + err.message);
-  });
+  }, 30000);
 }
 
 
