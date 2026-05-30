@@ -109,6 +109,7 @@ video { width: 100%; height: 100%; object-fit: cover; display: block; }
 <div id="nav">
   <button class="on" onclick="nav(this,'stock')">📦 Stock</button>
   <button onclick="nav(this,'scan')">📷 Scanner</button>
+  <button onclick="nav(this,'entrees')">📥 Entrées</button>
   <button onclick="nav(this,'commande')">🛒 Commande</button>
   <button onclick="nav(this,'qr')">🔲 QR Codes</button>
   <button onclick="nav(this,'params')">⚙️ Paramètres</button>
@@ -189,6 +190,59 @@ video { width: 100%; height: 100%; object-fit: cover; display: block; }
       <div class="gap">
         <button class="btn btn-green" style="flex:1;justify-content:center;font-size:16px;padding:14px" onclick="validateRenflo()">✅ Renflouement terminé — Déduire du stock</button>
         <button class="btn btn-red btn-sm" onclick="clearRenflo()">🗑 Vider</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- COMMANDE -->
+<div id="page-entrees" class="page">
+  <div class="card">
+    <h2>📥 Réception de livraison</h2>
+    <p style="color:#666;margin-bottom:14px;font-size:15px">Scannez ou sélectionnez les articles reçus de PMGLD Tintigny. Le stock sera augmenté automatiquement.</p>
+    <div class="onglets">
+      <button class="onglet on" id="etab-cam" onclick="eSetTab('cam')">📷 Caméra</button>
+      <button class="onglet off" id="etab-man" onclick="eSetTab('man')">✋ Manuel</button>
+    </div>
+    <div id="ezone-cam">
+      <div id="evideo-container" style="display:none;position:relative;width:100%;max-width:360px;margin:0 auto 12px;border-radius:12px;overflow:hidden;border:3px solid #1a7a3c;background:#000;aspect-ratio:1/1">
+        <video id="evid" playsinline muted></video>
+        <div class="frame" style="border-color:white"></div>
+      </div>
+      <div id="ecam-status" class="alert alert-green" style="display:none">🔍 Pointez vers un QR code...</div>
+      <div style="text-align:center;margin-bottom:12px">
+        <button class="btn btn-green" id="ebtn-start" onclick="eStartCam()" style="font-size:17px;padding:14px 28px">📷 Démarrer la caméra</button>
+        <button class="btn btn-grey" id="ebtn-stop" onclick="eStopCam()" style="display:none;font-size:17px;padding:14px 28px">⏹ Arrêter</button>
+      </div>
+    </div>
+    <div id="ezone-man" style="display:none">
+      <div class="search-wrap"><input type="text" id="es-man" placeholder="Tapez pour chercher..." oninput="eDrawManuel()"></div>
+      <div id="elist-man" style="border:2px solid #dde;border-radius:8px;max-height:300px;overflow-y:auto"></div>
+    </div>
+    <div id="eresult-box" style="display:none;background:#e6f4eb;border:3px solid #1a7a3c;border-radius:12px;padding:20px;margin-top:16px">
+      <h3 id="eres-name" style="font-size:20px;color:#1a7a3c;margin-bottom:6px">–</h3>
+      <p id="eres-info" style="color:#555;margin-bottom:14px">–</p>
+      <div class="qty-row">
+        <button class="qty-btn" style="border-color:#1a7a3c;color:#1a7a3c" onclick="eChgQty(-1)">−</button>
+        <input type="number" id="eqty-input" value="1" min="1" max="9999" style="width:90px;height:52px;text-align:center;font-size:26px;font-weight:700;border:2px solid #1a7a3c;border-radius:8px">
+        <button class="qty-btn" style="border-color:#1a7a3c;color:#1a7a3c" onclick="eChgQty(+1)">+</button>
+      </div>
+      <button class="btn btn-green btn-big" onclick="eAddToList()">📥 Ajouter à la réception</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="flex-row">
+      <h2>📋 Articles reçus</h2>
+      <span id="ebadge" style="background:#1a7a3c;color:white;border-radius:20px;padding:4px 14px;font-weight:700">0</span>
+    </div>
+    <div id="eentree-empty" style="text-align:center;color:#888;padding:20px">📭 Aucun article ajouté.</div>
+    <div id="eentree-list"></div>
+    <div id="eentree-actions" style="display:none;margin-top:14px">
+      <div class="alert alert-green" style="margin-bottom:12px">✅ Vérifiez la liste puis validez pour mettre le stock à jour sur tous les appareils.</div>
+      <div class="gap">
+        <button class="btn btn-green" style="flex:1;justify-content:center;font-size:16px;padding:14px" onclick="eValidate()">✅ Valider la réception — Ajouter au stock</button>
+        <button class="btn btn-red btn-sm" onclick="eClear()">🗑 Vider</button>
       </div>
     </div>
   </div>
@@ -10479,6 +10533,9 @@ function nav(btn, page) {
   if (page === 'commande') { window._currentPage = 'Commande'; drawCommande(); }
   if (page === 'qr') { window._currentPage = 'QR'; drawQR(); }
   if (page === 'params') { window._currentPage = 'Params'; drawParams(); }
+  if (page === 'entrees') { window._currentPage = 'Entrees'; }
+  if (page !== 'scan' && page !== 'entrees') stopCam();
+  if (page !== 'entrees') eStopCam();
 }
 
 // ── STOCK ──
@@ -10751,6 +10808,146 @@ function validateRenflo() {
   });
   renflo = []; drawRenflo();
   showOK('Renflouement validé ✅', 'Le stock a été mis à jour en temps réel sur tous les appareils.');
+}
+
+// ── ENTRÉES (RÉCEPTION LIVRAISON) ──
+var eRenflo = [];
+var eCamStream = null;
+var eCamOn = false;
+var eCamPaused = false;
+var ePendingArt = null;
+var eScanCanvas = document.createElement('canvas');
+var eScanCtx = eScanCanvas.getContext('2d');
+
+function eSetTab(t) {
+  document.getElementById('ezone-cam').style.display = t==='cam' ? '' : 'none';
+  document.getElementById('ezone-man').style.display = t==='man' ? '' : 'none';
+  document.getElementById('etab-cam').className = 'onglet ' + (t==='cam'?'on':'off');
+  document.getElementById('etab-man').className = 'onglet ' + (t==='man'?'on':'off');
+  eHideResult();
+  if (t === 'man') { eStopCam(); eDrawManuel(); }
+}
+
+function eStartCam() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { alert('Caméra non disponible.\nUtilisez le mode Manuel.'); return; }
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } } })
+  .then(function(stream) {
+    eCamStream = stream;
+    var vid = document.getElementById('evid');
+    vid.srcObject = stream; vid.play();
+    document.getElementById('evideo-container').style.display = '';
+    document.getElementById('ecam-status').style.display = '';
+    document.getElementById('ebtn-start').style.display = 'none';
+    document.getElementById('ebtn-stop').style.display = '';
+    eCamOn = true; eCamPaused = false;
+    requestAnimationFrame(eScanLoop);
+  }).catch(function(err) { alert('Caméra refusée.\nErreur : ' + err.message + '\nPassez en mode Manuel.'); });
+}
+
+function eStopCam() {
+  eCamOn = false;
+  if (eCamStream) { eCamStream.getTracks().forEach(function(t){t.stop();}); eCamStream = null; }
+  var vc=document.getElementById('evideo-container'); if(vc) vc.style.display='none';
+  var cs=document.getElementById('ecam-status'); if(cs) cs.style.display='none';
+  var bs=document.getElementById('ebtn-start'); if(bs) bs.style.display='';
+  var bp=document.getElementById('ebtn-stop'); if(bp) bp.style.display='none';
+}
+
+function eScanLoop() {
+  if (!eCamOn || eCamPaused) { if(eCamOn) setTimeout(function(){requestAnimationFrame(eScanLoop);},300); return; }
+  var vid = document.getElementById('evid');
+  if (vid.readyState >= 2 && vid.videoWidth > 0) {
+    eScanCanvas.width = vid.videoWidth; eScanCanvas.height = vid.videoHeight;
+    eScanCtx.drawImage(vid, 0, 0);
+    var img = eScanCtx.getImageData(0, 0, eScanCanvas.width, eScanCanvas.height);
+    var result = jsQR(img.data, img.width, img.height, {inversionAttempts:'attemptBoth'});
+    if (result && result.data) { eHandleQR(result.data); return; }
+  }
+  requestAnimationFrame(eScanLoop);
+}
+
+function eHandleQR(val) {
+  if (val.indexOf('BS:') !== 0) { requestAnimationFrame(eScanLoop); return; }
+  var id = parseInt(val.substring(3));
+  if (isNaN(id)) { requestAnimationFrame(eScanLoop); return; }
+  var art = findArt(id);
+  if (!art) { requestAnimationFrame(eScanLoop); return; }
+  eShowResult(art);
+}
+
+function eDrawManuel() {
+  var arts = getArts();
+  var f = (document.getElementById('es-man').value || '').toLowerCase();
+  var div = document.getElementById('elist-man'); div.innerHTML = '';
+  var list = arts.filter(function(a) { return a.nom.toLowerCase().indexOf(f) >= 0; });
+  if (!list.length) { div.innerHTML = '<div style="padding:14px;text-align:center;color:#888">Aucun résultat</div>'; return; }
+  list.forEach(function(a) {
+    var btn = document.createElement('button'); btn.className = 'man-btn';
+    btn.innerHTML = '<span style="font-weight:600">' + esc(a.nom) + '</span><span style="color:#1a7a3c;font-weight:700;font-size:19px">' + a.stock + '</span>';
+    btn.addEventListener('click', function() { eShowResult(a); });
+    div.appendChild(btn);
+  });
+}
+
+function eShowResult(art) {
+  ePendingArt = art; eCamPaused = true;
+  document.getElementById('eres-name').textContent = art.nom;
+  document.getElementById('eres-info').textContent = 'Stock actuel : ' + art.stock + '   |   Minimum : ' + art.mini;
+  document.getElementById('eqty-input').value = '1';
+  document.getElementById('eresult-box').style.display = 'block';
+  document.getElementById('eresult-box').scrollIntoView({behavior:'smooth', block:'nearest'});
+  setTimeout(function() { if(eCamOn && eCamPaused) { eCamPaused=false; requestAnimationFrame(eScanLoop); } }, 5000);
+}
+
+function eHideResult() {
+  ePendingArt = null; eCamPaused = false;
+  document.getElementById('eresult-box').style.display = 'none';
+}
+
+function eChgQty(d) {
+  var inp = document.getElementById('eqty-input');
+  inp.value = Math.max(1, (parseInt(inp.value)||0) + d);
+}
+
+function eAddToList() {
+  if (!ePendingArt) return;
+  var qty = parseInt(document.getElementById('eqty-input').value)||0;
+  if (qty <= 0) { alert('Entrez une quantité valide.'); return; }
+  var id = ePendingArt.id;
+  var ex = eRenflo.find(function(r){return r.id===id;});
+  if (ex) ex.qty += qty; else eRenflo.push({id:id, nom:ePendingArt.nom, qty:qty});
+  eHideResult();
+  if (eCamOn) requestAnimationFrame(eScanLoop);
+  eDrawList();
+}
+
+function eDrawList() {
+  var ul = document.getElementById('eentree-list');
+  document.getElementById('ebadge').textContent = eRenflo.length + ' article(s)';
+  document.getElementById('eentree-empty').style.display = eRenflo.length ? 'none' : '';
+  document.getElementById('eentree-actions').style.display = eRenflo.length ? '' : 'none';
+  ul.innerHTML = '';
+  eRenflo.forEach(function(r, i) {
+    var li = document.createElement('div'); li.className = 'renflo-item';
+    li.innerHTML = '<span style="flex:1;font-weight:600">' + esc(r.nom) + '</span>' +
+      '<span class="renflo-qty" style="color:#1a7a3c">+' + r.qty + '</span>' +
+      '<button class="renflo-del" onclick="eDelItem(' + i + ')">✕</button>';
+    ul.appendChild(li);
+  });
+}
+
+function eDelItem(i) { eRenflo.splice(i,1); eDrawList(); }
+
+function eClear() { if(confirm('Vider la liste ?')) { eRenflo=[]; eDrawList(); } }
+
+function eValidate() {
+  if (!confirm('Confirmer la réception ? Le stock sera augmenté et mis à jour sur tous les appareils.')) return;
+  eRenflo.forEach(function(r) {
+    var a = findArt(r.id);
+    if (a) { a.stock = a.stock + r.qty; fbSave(a); }
+  });
+  eRenflo = []; eDrawList();
+  showOK('Réception validée ✅', 'Le stock a été augmenté et mis à jour en temps réel sur tous les appareils.');
 }
 
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
