@@ -10676,29 +10676,31 @@ function exportCmd() {
   var stocks = {};
   arts.forEach(function(a) { stocks[a.nom] = a.stock; });
 
-  // Afficher chargement
   var btn = document.querySelector('[onclick="exportCmd()"]');
   var oldText = btn ? btn.innerHTML : '';
   if (btn) { btn.innerHTML = '⏳ Génération en cours...'; btn.disabled = true; }
 
-  fetch(APPS_SCRIPT_URL, {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({stocks: stocks})
-  })
+  // Utiliser GET + paramètre pour éviter CORS
+  var url = APPS_SCRIPT_URL + '?action=generer&stocks=' + encodeURIComponent(JSON.stringify(stocks));
+
+  var script = document.createElement('script');
+  
+  // Utiliser fetch en mode no-cors n'est pas possible pour lire la réponse
+  // On utilise donc fetch normal avec GET
+  fetch(url)
   .then(function(r) { return r.json(); })
   .then(function(data) {
     if (btn) { btn.innerHTML = oldText; btn.disabled = false; }
     if (data.status === 'ok') {
       window.open(data.url, '_blank');
-      showOK('Bon de commande généré ✅', 'La feuille Google Sheets a été mise à jour. Elle va s\'ouvrir dans un nouvel onglet.');
+      showOK('Bon de commande généré ✅', 'La feuille Google Sheets a été mise à jour et va s'ouvrir dans un nouvel onglet.');
     } else {
       alert('Erreur : ' + (data.message || 'inconnue'));
     }
   })
   .catch(function(err) {
     if (btn) { btn.innerHTML = oldText; btn.disabled = false; }
-    alert('Erreur de connexion : ' + err.message);
+    alert('Erreur : ' + err.message);
   });
 }
 
