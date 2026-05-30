@@ -10503,8 +10503,8 @@ var camStream = null;
 var camOn = false;
 var camPaused = false;
 var pendingArt = null;
-var scanCanvas = document.getElementById('scan-canvas');
-var scanCtx = scanCanvas.getContext('2d');
+var scanCanvas = null;
+var scanCtx = null;
 window._currentPage = 'Stock';
 
 function getArts() { return window._arts || []; }
@@ -10759,6 +10759,11 @@ function setTab(t) {
 }
 function startCam() {
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { alert('Caméra non disponible.\nUtilisez le mode Manuel.'); return; }
+  // Initialiser le canvas ici, pas au chargement
+  if (!scanCanvas) {
+    scanCanvas = document.getElementById('scan-canvas');
+    scanCtx = scanCanvas.getContext('2d');
+  }
   navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } } })
   .then(function(stream) {
     camStream = stream;
