@@ -367,7 +367,11 @@ onSnapshot(collection(db, COLL), function(snapshot) {
   window._arts = arts;
   document.getElementById('loading').style.display = 'none';
   document.getElementById('sync-status').textContent = '🟢 Synchronisé — ' + arts.length + ' articles';
-  if (window._currentPage) window['draw' + window._currentPage]();
+  var page = window._currentPage || 'Stock';
+  if (page === 'Stock') drawStock();
+  else if (page === 'Commande') drawCommande();
+  else if (page === 'QR') drawQR();
+  else if (page === 'Params') drawParams();
   else drawStock();
 }, function(err) {
   document.getElementById('sync-status').textContent = '🔴 Erreur de connexion';
