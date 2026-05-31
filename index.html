@@ -90,7 +90,12 @@ video { width: 100%; height: 100%; object-fit: cover; display: block; }
 #loading .spinner { width: 48px; height: 48px; border: 5px solid rgba(255,255,255,.3); border-top-color: white; border-radius: 50%; animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media(max-width:560px) { .stats { grid-template-columns: repeat(2,1fr); } .qr-grid { grid-template-columns: repeat(2,1fr); } }
-@media print { #header, #nav, .no-print { display: none !important; } .page { display: none !important; } #page-qr { display: block !important; } }
+@media print {
+  #header, #nav, .no-print { display: none !important; }
+  .page { display: none !important; }
+  #page-qr { display: block !important; }
+  #page-sorties.actif-print { display: block !important; }
+}
 </style>
 </head>
 <body>
@@ -116,6 +121,7 @@ video { width: 100%; height: 100%; object-fit: cover; display: block; }
   <button onclick="nav(this,'scan')">📷 Scanner</button>
   <button onclick="nav(this,'entrees')">📥 Entrées</button>
   <button onclick="nav(this,'commande')">🛒 Commande</button>
+  <button onclick="nav(this,'sorties')">📊 Sorties</button>
   <button onclick="nav(this,'qr')">🔲 QR Codes</button>
   <button onclick="nav(this,'params')">⚙️ Paramètres</button>
 </div>
@@ -268,6 +274,64 @@ video { width: 100%; height: 100%; object-fit: cover; display: block; }
   </div>
 </div>
 
+<!-- SORTIES -->
+<div id="page-sorties" class="page">
+  <div class="card no-print">
+    <h2>📊 Historique des sorties de stock</h2>
+    <p style="color:#666;margin-bottom:16px;font-size:15px">
+      Chaque renflouement validé est enregistré automatiquement. Filtrez par période pour voir ou imprimer les sorties.
+    </p>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px">
+      <div>
+        <label style="display:block;font-weight:700;margin-bottom:5px;font-size:15px">Date début</label>
+        <input type="date" id="sort-date-debut" style="padding:9px 12px;border:2px solid #dde;border-radius:8px;font-size:15px">
+      </div>
+      <div>
+        <label style="display:block;font-weight:700;margin-bottom:5px;font-size:15px">Date fin</label>
+        <input type="date" id="sort-date-fin" style="padding:9px 12px;border:2px solid #dde;border-radius:8px;font-size:15px">
+      </div>
+      <button class="btn btn-blue" onclick="chargerSorties()">🔍 Afficher</button>
+      <button class="btn btn-grey" onclick="setPeriode('semaine')">Cette semaine</button>
+      <button class="btn btn-grey" onclick="setPeriode('mois')">Ce mois</button>
+      <button class="btn btn-grey" onclick="setPeriode('mois_dernier')">Mois dernier</button>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn btn-green" onclick="exportSorties()">📥 Exporter Excel</button>
+      <button class="btn btn-blue" onclick="imprimerSorties()">🖨 Imprimer</button>
+    </div>
+  </div>
+
+  <!-- Zone imprimable -->
+  <div id="sorties-print-header" style="display:none">
+    <h2 style="font-size:16px;margin-bottom:4px">📊 Sorties de stock — Bièvre</h2>
+    <p id="sorties-print-periode" style="font-size:13px;color:#666;margin-bottom:12px"></p>
+  </div>
+
+  <div class="card">
+    <div class="flex-row" style="margin-bottom:12px">
+      <div>
+        <strong id="sorties-titre">Sélectionnez une période</strong>
+      </div>
+      <span id="sorties-total" style="background:#1a5fa8;color:white;border-radius:20px;padding:4px 14px;font-weight:700;font-size:14px"></span>
+    </div>
+    <div id="sorties-loading" style="text-align:center;color:#888;padding:20px;display:none">⏳ Chargement...</div>
+    <div id="sorties-vide" style="text-align:center;color:#888;padding:20px">Choisissez une période et cliquez sur Afficher.</div>
+    <div class="tbl-wrap">
+      <table id="sorties-table" style="display:none">
+        <thead>
+          <tr>
+            <th style="width:20%">Date</th>
+            <th style="width:55%">Article</th>
+            <th style="width:25%;text-align:center">Quantité sortie</th>
+          </tr>
+        </thead>
+        <tbody id="sorties-tbody"></tbody>
+        <tfoot id="sorties-tfoot"></tfoot>
+      </table>
+    </div>
+  </div>
+</div>
+
 <!-- QR -->
 <div id="page-qr" class="page">
   <div class="card">
@@ -340,7 +404,7 @@ video { width: 100%; height: 100%; object-fit: cover; display: block; }
 <!-- FIREBASE SDK -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js";
-import { getFirestore, collection, doc, onSnapshot, setDoc, deleteDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js";
+import { getFirestore, collection, doc, onSnapshot, setDoc, deleteDoc, getDocs, addDoc, query, orderBy, where, Timestamp } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-firestore.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyDLSiNasmQqM_xxeTwnU934oITb4ou-MP8",
@@ -357,7 +421,7 @@ const COLL = "articles_bievre";
 // Rendre les fonctions Firebase accessibles globalement
 window._db = db;
 window._coll = COLL;
-window._fns = { collection, doc, onSnapshot, setDoc, deleteDoc, getDocs };
+window._fns = { collection, doc, onSnapshot, setDoc, deleteDoc, getDocs, addDoc, query, orderBy, where, Timestamp };
 
 // Écoute temps réel
 onSnapshot(collection(db, COLL), function(snapshot) {
@@ -10543,6 +10607,7 @@ function nav(btn, page) {
   if (page === 'qr') { window._currentPage = 'QR'; drawQR(); }
   if (page === 'params') { window._currentPage = 'Params'; drawParams(); }
   if (page === 'entrees') { window._currentPage = 'Entrees'; }
+  if (page === 'sorties') { window._currentPage = 'Sorties'; initSorties(); }
   if (page !== 'scan' && page !== 'entrees') stopCam();
   if (page !== 'entrees') eStopCam();
 }
@@ -10864,12 +10929,162 @@ function delRenflo(i) { renflo.splice(i,1); drawRenflo(); }
 function clearRenflo() { if(confirm('Vider la liste ?')) { renflo=[]; drawRenflo(); } }
 function validateRenflo() {
   if (!confirm('Confirmer le renflouement ? Le stock sera réduit et mis à jour sur tous les appareils.')) return;
+  var now = new Date();
   renflo.forEach(function(r) {
     var a = findArt(r.id);
-    if (a) { a.stock = Math.max(0, a.stock - r.qty); fbSave(a); }
+    if (a) {
+      a.stock = Math.max(0, a.stock - r.qty);
+      fbSave(a);
+      // Enregistrer la sortie dans Firebase
+      fbEnregistrerSortie(a.nom, r.qty, now);
+    }
   });
   renflo = []; drawRenflo();
   showOK('Renflouement validé ✅', 'Le stock a été mis à jour en temps réel sur tous les appareils.');
+}
+
+// ── ENREGISTREMENT DES SORTIES ──
+function fbEnregistrerSortie(nom, qte, date) {
+  var db = window._db; var fns = window._fns;
+  fns.addDoc(fns.collection(db, 'sorties_bievre'), {
+    nom: nom,
+    qte: qte,
+    date: fns.Timestamp.fromDate(date),
+    dateStr: date.toLocaleDateString('fr-BE'),
+    heureStr: date.toLocaleTimeString('fr-BE', {hour:'2-digit', minute:'2-digit'})
+  }).catch(function(e) { console.error('Erreur sortie:', e); });
+}
+
+// ── PAGE SORTIES ──
+var _sorties = [];
+
+function setPeriode(type) {
+  var debut = document.getElementById('sort-date-debut');
+  var fin   = document.getElementById('sort-date-fin');
+  var now   = new Date();
+  var d, f;
+  if (type === 'semaine') {
+    var day = now.getDay() || 7;
+    d = new Date(now); d.setDate(now.getDate() - day + 1);
+    f = new Date(now);
+  } else if (type === 'mois') {
+    d = new Date(now.getFullYear(), now.getMonth(), 1);
+    f = new Date(now);
+  } else if (type === 'mois_dernier') {
+    d = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    f = new Date(now.getFullYear(), now.getMonth(), 0);
+  }
+  debut.value = d.toISOString().split('T')[0];
+  fin.value   = f.toISOString().split('T')[0];
+  chargerSorties();
+}
+
+function chargerSorties() {
+  var debutVal = document.getElementById('sort-date-debut').value;
+  var finVal   = document.getElementById('sort-date-fin').value;
+  if (!debutVal || !finVal) { alert('Sélectionnez une date de début et de fin.'); return; }
+
+  var debut = new Date(debutVal + 'T00:00:00');
+  var fin   = new Date(finVal   + 'T23:59:59');
+
+  document.getElementById('sorties-loading').style.display = '';
+  document.getElementById('sorties-vide').style.display    = 'none';
+  document.getElementById('sorties-table').style.display   = 'none';
+
+  var db = window._db; var fns = window._fns;
+  var q = fns.query(
+    fns.collection(db, 'sorties_bievre'),
+    fns.where('date', '>=', fns.Timestamp.fromDate(debut)),
+    fns.where('date', '<=', fns.Timestamp.fromDate(fin)),
+    fns.orderBy('date', 'asc')
+  );
+
+  fns.getDocs(q).then(function(snap) {
+    _sorties = [];
+    snap.forEach(function(d) { _sorties.push(d.data()); });
+    document.getElementById('sorties-loading').style.display = 'none';
+    afficherSorties(debutVal, finVal);
+  }).catch(function(err) {
+    document.getElementById('sorties-loading').style.display = 'none';
+    document.getElementById('sorties-vide').style.display = '';
+    document.getElementById('sorties-vide').textContent = '❌ Erreur : ' + err.message;
+  });
+}
+
+function afficherSorties(debutVal, finVal) {
+  var tbody  = document.getElementById('sorties-tbody');
+  var tfoot  = document.getElementById('sorties-tfoot');
+  var table  = document.getElementById('sorties-table');
+  var vide   = document.getElementById('sorties-vide');
+  var titre  = document.getElementById('sorties-titre');
+  var total  = document.getElementById('sorties-total');
+
+  var d1 = new Date(debutVal).toLocaleDateString('fr-BE');
+  var d2 = new Date(finVal).toLocaleDateString('fr-BE');
+  var periodeStr = 'Du ' + d1 + ' au ' + d2;
+  titre.textContent = periodeStr;
+  document.getElementById('sorties-print-periode').textContent = periodeStr;
+  document.getElementById('sorties-print-header').style.display = '';
+
+  if (!_sorties.length) {
+    vide.style.display = ''; vide.textContent = '📭 Aucune sortie sur cette période.';
+    table.style.display = 'none';
+    total.textContent = '0 sortie';
+    return;
+  }
+
+  vide.style.display = 'none';
+  table.style.display = '';
+  tbody.innerHTML = '';
+
+  // Grouper par article pour le total
+  var totaux = {};
+  var totalQte = 0;
+
+  _sorties.forEach(function(s, i) {
+    var tr = document.createElement('tr');
+    var bg = i % 2 === 0 ? '' : 'background:#f8f9fa';
+    tr.innerHTML =
+      '<td style="' + bg + ';padding:9px 10px;font-size:14px;border-bottom:1px solid #eee">' +
+        s.dateStr + ' ' + (s.heureStr||'') + '</td>' +
+      '<td style="' + bg + ';padding:9px 10px;font-size:14px;font-weight:500;border-bottom:1px solid #eee">' +
+        esc(s.nom) + '</td>' +
+      '<td style="' + bg + ';padding:9px 10px;font-size:15px;font-weight:700;text-align:center;color:#c0392b;border-bottom:1px solid #eee">' +
+        '−' + s.qte + '</td>';
+    tbody.appendChild(tr);
+    totaux[s.nom] = (totaux[s.nom] || 0) + s.qte;
+    totalQte += s.qte;
+  });
+
+  // Pied de tableau : totaux par article
+  tfoot.innerHTML = '';
+  var tfr = document.createElement('tr');
+  tfr.innerHTML = '<td colspan="3" style="background:#f0f4f8;padding:6px 10px;font-size:13px;font-weight:700;color:#1a5fa8">TOTAUX PAR ARTICLE</td>';
+  tfoot.appendChild(tfr);
+  Object.keys(totaux).sort().forEach(function(nom) {
+    var tr2 = document.createElement('tr');
+    tr2.innerHTML =
+      '<td style="background:#f0f4f8;padding:6px 10px;font-size:13px;color:#666" colspan="2">' + esc(nom) + '</td>' +
+      '<td style="background:#f0f4f8;padding:6px 10px;font-size:14px;font-weight:700;text-align:center;color:#1a5fa8">' + totaux[nom] + '</td>';
+    tfoot.appendChild(tr2);
+  });
+
+  total.textContent = _sorties.length + ' sortie(s) — ' + totalQte + ' unités';
+}
+
+function exportSorties() {
+  if (!_sorties.length) { alert('Aucune donnée à exporter. Choisissez une période et cliquez Afficher.'); return; }
+  var csv = 'Date;Heure;Article;Quantité sortie\n';
+  _sorties.forEach(function(s) {
+    csv += s.dateStr + ';' + (s.heureStr||'') + ';"' + s.nom + '";' + s.qte + '\n';
+  });
+  var blob = new Blob(['\uFEFF' + csv], {type:'text/csv;charset=utf-8;'});
+  var lnk = document.createElement('a');
+  var debut = document.getElementById('sort-date-debut').value;
+  var fin   = document.getElementById('sort-date-fin').value;
+  lnk.href = URL.createObjectURL(blob);
+  lnk.download = 'sorties_bievre_' + debut + '_' + fin + '.csv';
+  document.body.appendChild(lnk); lnk.click(); document.body.removeChild(lnk);
 }
 
 // ── ENTRÉES (RÉCEPTION LIVRAISON) ──
@@ -11010,6 +11225,19 @@ function eValidate() {
   });
   eRenflo = []; eDrawList();
   showOK('Réception validée ✅', 'Le stock a été augmenté et mis à jour en temps réel sur tous les appareils.');
+}
+
+function imprimerSorties() {
+  document.getElementById('page-sorties').classList.add('actif-print');
+  window.print();
+  document.getElementById('page-sorties').classList.remove('actif-print');
+}
+
+function initSorties() {
+  var now = new Date();
+  var debut = new Date(now.getFullYear(), now.getMonth(), 1);
+  document.getElementById('sort-date-debut').value = debut.toISOString().split('T')[0];
+  document.getElementById('sort-date-fin').value   = now.toISOString().split('T')[0];
 }
 
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
