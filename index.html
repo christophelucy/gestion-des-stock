@@ -360,14 +360,18 @@ video { width: 100%; height: 100%; object-fit: cover; display: block; }
     <div class="alert alert-orange" style="margin-bottom:14px">
       ⚠️ Modifier le stock actuel ici ne génère <strong>pas d'historique de sortie</strong>. À utiliser uniquement pour les corrections d'inventaire.
     </div>
+    <div class="alert alert-blue" style="margin-bottom:14px">
+      📦 <strong>Taille boîte</strong> : nombre d'unités dans un conditionnement (ex : 100 pour une boîte d'aiguilles, 2 pour des compresses vendues par paire). Laissez à <strong>1</strong> pour un article vendu à l'unité. Tant que le stock n'atteint pas une boîte complète, la commande proposera "1 boîte" plutôt qu'un nombre d'unités.
+    </div>
     <div class="search-wrap"><input type="text" id="s-params" placeholder="Rechercher..." oninput="drawParams()"></div>
     <div class="tbl-wrap">
       <table>
         <thead><tr>
-          <th style="width:45%">Désignation</th>
-          <th style="text-align:center;width:20%">Stock actuel</th>
-          <th style="text-align:center;width:20%">Stock minimum</th>
-          <th style="text-align:center;width:15%">État</th>
+          <th style="width:36%">Désignation</th>
+          <th style="text-align:center;width:16%">Stock actuel</th>
+          <th style="text-align:center;width:16%">Stock minimum</th>
+          <th style="text-align:center;width:16%">Taille boîte</th>
+          <th style="text-align:center;width:16%">État</th>
         </tr></thead>
         <tbody id="tbody-params"></tbody>
       </table>
@@ -10776,6 +10780,7 @@ function drawParams() {
   tbody.innerHTML = '';
   arts.filter(function(a) { return a.nom.toLowerCase().indexOf(f) >= 0; }).forEach(function(a) {
     var low = a.stock < a.mini;
+    var tb = (a.taillebte === undefined || a.taillebte === null) ? 1 : a.taillebte;
     var badge = low
       ? '<span class="badge badge-low">' + (a.stock===0?'Rupture':'⚠ Bas') + '</span>'
       : '<span class="badge badge-ok">✓ OK</span>';
@@ -10791,6 +10796,10 @@ function drawParams() {
         '<input type="number" value="' + a.mini + '" min="0" id="mini-' + a.id + '" ' +
         'style="width:90px;text-align:center;padding:7px;border:2px solid #dde;border-radius:6px;font-size:16px" ' +
         'onchange="markChange(' + a.id + ')" oninput="markChange(' + a.id + ')"></td>' +
+      '<td style="text-align:center">' +
+        '<input type="number" value="' + tb + '" min="1" id="taillebte-' + a.id + '" ' +
+        'style="width:90px;text-align:center;padding:7px;border:2px solid #dde;border-radius:6px;font-size:16px" ' +
+        'onchange="markChange(' + a.id + ')" oninput="markChange(' + a.id + ')"></td>' +
       '<td style="text-align:center">' + badge + '</td>';
     tbody.appendChild(tr);
   });
@@ -10801,8 +10810,10 @@ function markChange(id) {
   // Mettre en évidence visuellement
   var stockInp = document.getElementById('stock-' + id);
   var miniInp  = document.getElementById('mini-' + id);
+  var tbInp    = document.getElementById('taillebte-' + id);
   if (stockInp) stockInp.style.borderColor = '#e67e22';
   if (miniInp)  miniInp.style.borderColor  = '#e67e22';
+  if (tbInp)    tbInp.style.borderColor    = '#e67e22';
 }
 
 function saveParams() {
@@ -10811,12 +10822,16 @@ function saveParams() {
   arts.forEach(function(a) {
     var stockInp = document.getElementById('stock-' + a.id);
     var miniInp  = document.getElementById('mini-' + a.id);
+    var tbInp    = document.getElementById('taillebte-' + a.id);
     if (!stockInp || !miniInp) return;
     var newStock = parseInt(stockInp.value) || 0;
     var newMini  = parseInt(miniInp.value)  || 0;
-    if (newStock !== a.stock || newMini !== a.mini) {
+    var newTb    = tbInp ? (parseInt(tbInp.value) || 1) : (a.taillebte || 1);
+    var oldTb    = (a.taillebte === undefined || a.taillebte === null) ? 1 : a.taillebte;
+    if (newStock !== a.stock || newMini !== a.mini || newTb !== oldTb) {
       a.stock = newStock;
       a.mini  = newMini;
+      a.taillebte = newTb;
       fbSave(a);
       nbChanges++;
     }
@@ -10835,10 +10850,22 @@ function drawCommande() {
   var div = document.getElementById('cmd-list');
   div.innerHTML = '';
   low.forEach(function(a) {
-    var q = Math.max(a.mini - a.stock, 1);
+    var tb = (a.taillebte === undefined || a.taillebte === null || a.taillebte < 1) ? 1 : a.taillebte;
     var d = document.createElement('div');
     d.className = 'cmd-item';
-    d.innerHTML = '<span style="font-weight:600">' + esc(a.nom) + '</span><span><span style="color:#888;font-size:13px">stock:' + a.stock + ' / mini:' + a.mini + ' → </span><span class="cmd-qty">+' + q + '</span></span>';
+    var qtyHtml;
+    if (tb > 1) {
+      // Article vendu par boîte : tant qu'on n'a pas une boîte pleine, on commande 1 boîte entière.
+      var boites = Math.max(1, Math.ceil((tb - a.stock) / tb));
+      // Si le stock est déjà négatif/très bas par rapport à plusieurs boîtes, on commande assez de boîtes pour dépasser le mini.
+      var manque = a.mini - a.stock;
+      if (manque > tb) boites = Math.max(boites, Math.ceil(manque / tb));
+      qtyHtml = '<span class="cmd-qty">📦 ' + boites + ' boîte' + (boites > 1 ? 's' : '') + ' (de ' + tb + ')</span>';
+    } else {
+      var q = Math.max(a.mini - a.stock, 1);
+      qtyHtml = '<span class="cmd-qty">+' + q + '</span>';
+    }
+    d.innerHTML = '<span style="font-weight:600">' + esc(a.nom) + '</span><span><span style="color:#888;font-size:13px">stock:' + a.stock + ' / mini:' + a.mini + ' → </span>' + qtyHtml + '</span>';
     div.appendChild(d);
   });
 }
