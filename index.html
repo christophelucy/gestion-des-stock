@@ -64,9 +64,10 @@ video { width: 100%; height: 100%; object-fit: cover; display: block; }
 .cmd-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; border-bottom: 1px solid #eee; font-size: 15px; }
 .cmd-item:last-child { border-bottom: none; }
 .cmd-qty { font-size: 20px; font-weight: 700; color: #c0392b; }
-.qr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(165px,1fr)); gap: 14px; }
-.qr-card { background: white; border: 2px solid #dde; border-radius: 10px; padding: 12px; text-align: center; }
-.qr-label { font-size: 12px; font-weight: 700; margin-top: 8px; line-height: 1.3; color: #222; }
+.qr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px,1fr)); gap: 28px; }
+.qr-card { background: white; border: 2px solid #dde; border-radius: 10px; padding: 14px 10px; text-align: center; }
+.qr-card > div:first-child { display:flex; justify-content:center; }
+.qr-label { font-size: 16px; font-weight: 700; margin-top: 10px; line-height: 1.35; color: #222; word-break: break-word; }
 .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 100; align-items: center; justify-content: center; }
 .overlay.on { display: flex; }
 .modal { background: white; border-radius: 14px; padding: 22px; width: 92%; max-width: 440px; box-shadow: 0 8px 30px rgba(0,0,0,.2); }
@@ -89,12 +90,14 @@ video { width: 100%; height: 100%; object-fit: cover; display: block; }
 #loading { position: fixed; inset: 0; background: #1a5fa8; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 999; font-size: 20px; gap: 16px; }
 #loading .spinner { width: 48px; height: 48px; border: 5px solid rgba(255,255,255,.3); border-top-color: white; border-radius: 50%; animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-@media(max-width:560px) { .stats { grid-template-columns: repeat(2,1fr); } .qr-grid { grid-template-columns: repeat(2,1fr); } }
+@media(max-width:560px) { .stats { grid-template-columns: repeat(2,1fr); } .qr-grid { grid-template-columns: repeat(2,1fr); gap: 20px; } }
 @media print {
   #header, #nav, .no-print { display: none !important; }
   .page { display: none !important; }
   #page-qr { display: block !important; }
   #page-sorties.actif-print { display: block !important; }
+  .qr-grid { grid-template-columns: repeat(3, 1fr) !important; gap: 18px 24px !important; }
+  .qr-card { border: 1px dashed #999 !important; padding: 10px !important; break-inside: avoid; page-break-inside: avoid; }
 }
 </style>
 </head>
@@ -117,17 +120,18 @@ video { width: 100%; height: 100%; object-fit: cover; display: block; }
 </div>
 
 <div id="nav">
-  <button class="on" onclick="nav(this,'stock')">📦 Stock</button>
-  <button onclick="nav(this,'scan')">📷 Scanner</button>
-  <button onclick="nav(this,'entrees')">📥 Entrées</button>
-  <button onclick="nav(this,'commande')">🛒 Commande</button>
-  <button onclick="nav(this,'sorties')">📊 Sorties</button>
-  <button onclick="nav(this,'qr')">🔲 QR Codes</button>
-  <button onclick="nav(this,'params')">⚙️ Paramètres</button>
+  <button class="off" id="nbtn-stock" onclick="nav(this,'stock')" style="display:none">📦 Stock</button>
+  <button class="on" id="nbtn-scan" onclick="nav(this,'scan')">📦 Prélever du matériel</button>
+  <button class="off" id="nbtn-entrees" onclick="nav(this,'entrees')" style="display:none">📥 Entrées</button>
+  <button class="off" id="nbtn-commande" onclick="nav(this,'commande')" style="display:none">🛒 Commande</button>
+  <button id="nbtn-sorties" onclick="nav(this,'sorties')">📊 Sorties</button>
+  <button class="off" id="nbtn-qr" onclick="nav(this,'qr')" style="display:none">🔲 QR Codes</button>
+  <button class="off" id="nbtn-params" onclick="nav(this,'params')" style="display:none">⚙️ Paramètres</button>
+  <button id="nbtn-lock" onclick="openLockModal()" style="margin-left:auto;background:none;color:#888;font-size:13px">🔒 Mode complet</button>
 </div>
 
 <!-- STOCK -->
-<div id="page-stock" class="page on">
+<div id="page-stock" class="page">
   <div class="stats">
     <div class="stat"><div class="n" id="st-tot" style="color:#1a5fa8">-</div><div class="l">Articles</div></div>
     <div class="stat"><div class="n" id="st-cmd" style="color:#c0392b">-</div><div class="l">À commander</div></div>
@@ -156,14 +160,15 @@ video { width: 100%; height: 100%; object-fit: cover; display: block; }
 </div>
 
 <!-- SCAN -->
-<div id="page-scan" class="page">
+<div id="page-scan" class="page on">
   <div class="card">
-    <h2>📷 Scanner / Sélectionner</h2>
+    <h2>📦 Prélever du matériel</h2>
+    <p style="color:#666;margin-bottom:14px;font-size:15px">Cherchez un produit dans la liste ci-dessous, indiquez la quantité à aller chercher dans l'armoire, puis ajoutez-le à votre liste de renflouement.</p>
     <div class="onglets">
-      <button class="onglet on" id="tab-cam" onclick="setTab('cam')">📷 Caméra</button>
-      <button class="onglet off" id="tab-man" onclick="setTab('man')">✋ Manuel</button>
+      <button class="onglet off" id="tab-cam" onclick="setTab('cam')">📷 Caméra</button>
+      <button class="onglet on" id="tab-man" onclick="setTab('man')">✋ Manuel</button>
     </div>
-    <div id="zone-cam">
+    <div id="zone-cam" style="display:none">
       <div id="video-container" style="display:none">
         <video id="vid" playsinline muted></video>
         <div class="frame"></div>
@@ -174,7 +179,7 @@ video { width: 100%; height: 100%; object-fit: cover; display: block; }
         <button class="btn btn-grey" id="btn-stop" onclick="stopCam()" style="display:none;font-size:17px;padding:14px 28px">⏹ Arrêter</button>
       </div>
     </div>
-    <div id="zone-man" style="display:none">
+    <div id="zone-man">
       <div class="search-wrap"><input type="text" id="s-man" placeholder="Tapez pour chercher..." oninput="drawManuel()"></div>
       <div id="list-man"></div>
     </div>
@@ -404,6 +409,21 @@ video { width: 100%; height: 100%; object-fit: cover; display: block; }
     <h2 id="ok-title" style="text-align:center"></h2>
     <p id="ok-msg" style="color:#666;margin-top:8px"></p>
     <div style="margin-top:20px"><button class="btn btn-green" style="font-size:17px;padding:14px 32px" onclick="closeModal()">OK</button></div>
+  </div>
+</div>
+<div class="overlay" id="m-lock">
+  <div class="modal">
+    <h2>🔒 Mode complet</h2>
+    <p style="color:#666;margin-bottom:14px">Réservé au personnel formé à la gestion du stock.</p>
+    <div class="form-row">
+      <label>Mot de passe</label>
+      <input type="password" id="lock-pwd" placeholder="••••••••" onkeydown="if(event.key==='Enter')confirmLock()">
+    </div>
+    <p id="lock-err" style="color:#c0392b;font-weight:700;display:none">❌ Mot de passe incorrect</p>
+    <div class="modal-btns">
+      <button class="btn btn-grey" onclick="closeModal()">Annuler</button>
+      <button class="btn btn-green" onclick="confirmLock()">✅ Déverrouiller</button>
+    </div>
   </div>
 </div>
 
@@ -10614,6 +10634,7 @@ function nav(btn, page) {
   if (page === 'commande') { window._currentPage = 'Commande'; drawCommande(); }
   if (page === 'qr') { window._currentPage = 'QR'; drawQR(); }
   if (page === 'params') { window._currentPage = 'Params'; drawParams(); }
+  if (page === 'scan') { window._currentPage = 'Scan'; drawManuel(); }
   if (page === 'entrees') { window._currentPage = 'Entrees'; }
   if (page === 'sorties') { window._currentPage = 'Sorties'; initSorties(); }
   if (page !== 'scan' && page !== 'entrees') stopCam();
@@ -10698,6 +10719,50 @@ function confirmEdit() {
   closeModal();
 }
 function closeModal() { document.querySelectorAll('.overlay').forEach(function(o) { o.classList.remove('on'); }); }
+
+// ── MODE COMPLET (verrouillage optionnel) ──
+var FULL_MODE_PWD = 'Al.1733';
+var fullModeUnlocked = false;
+var RESTRICTED_BTNS = ['nbtn-stock','nbtn-entrees','nbtn-commande','nbtn-qr','nbtn-params'];
+
+function openLockModal() {
+  if (fullModeUnlocked) { lockApp(); return; }
+  document.getElementById('lock-pwd').value = '';
+  document.getElementById('lock-err').style.display = 'none';
+  document.querySelectorAll('.overlay').forEach(function(o) { o.classList.remove('on'); });
+  document.getElementById('m-lock').classList.add('on');
+  setTimeout(function() { document.getElementById('lock-pwd').focus(); }, 100);
+}
+
+function confirmLock() {
+  var v = document.getElementById('lock-pwd').value;
+  if (v === FULL_MODE_PWD) {
+    fullModeUnlocked = true;
+    RESTRICTED_BTNS.forEach(function(id) { document.getElementById(id).style.display = ''; });
+    document.getElementById('nbtn-lock').textContent = '🔓 Verrouiller';
+    closeModal();
+  } else {
+    document.getElementById('lock-err').style.display = 'block';
+    document.getElementById('lock-pwd').value = '';
+    document.getElementById('lock-pwd').focus();
+  }
+}
+
+function lockApp() {
+  fullModeUnlocked = false;
+  RESTRICTED_BTNS.forEach(function(id) { document.getElementById(id).style.display = 'none'; });
+  document.getElementById('nbtn-lock').textContent = '🔒 Mode complet';
+  // Si on est sur une page désormais cachée, revenir à la page Prélever
+  var hiddenPages = ['stock','entrees','commande','qr','params'];
+  if (hiddenPages.indexOf(window._currentPage ? window._currentPage.toLowerCase() : '') !== -1 ||
+      document.getElementById('page-stock').classList.contains('on') ||
+      document.getElementById('page-entrees').classList.contains('on') ||
+      document.getElementById('page-commande').classList.contains('on') ||
+      document.getElementById('page-qr').classList.contains('on') ||
+      document.getElementById('page-params').classList.contains('on')) {
+    nav(document.getElementById('nbtn-scan'), 'scan');
+  }
+}
 function showOK(t, m) { document.getElementById('ok-title').textContent=t; document.getElementById('ok-msg').textContent=m; document.getElementById('m-ok').classList.add('on'); }
 
 // ── PARAMS ──
@@ -10851,7 +10916,7 @@ function drawQR() {
     card.appendChild(qrDiv); card.appendChild(label);
     grid.appendChild(card);
     try {
-      new QRCode(qrDiv, { text: 'BS:' + a.id, width: 150, height: 150, colorDark: '#000000', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.L });
+      new QRCode(qrDiv, { text: 'BS:' + a.id, width: 90, height: 90, colorDark: '#000000', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.L });
     } catch(e) { qrDiv.textContent = 'Erreur QR'; }
   });
 }
