@@ -360,8 +360,23 @@ video { width: 100%; height: 100%; object-fit: cover; display: block; }
     <div class="alert alert-orange" style="margin-bottom:14px">
       ⚠️ Modifier le stock actuel ici ne génère <strong>pas d'historique de sortie</strong>. À utiliser uniquement pour les corrections d'inventaire.
     </div>
-    <div class="alert alert-blue" style="margin-bottom:14px">
-      📦 <strong>Taille boîte</strong> : nombre d'unités dans un conditionnement (ex : 100 pour une boîte d'aiguilles, 2 pour des compresses vendues par paire). Laissez à <strong>1</strong> pour un article vendu à l'unité. Tant que le stock n'atteint pas une boîte complète, la commande proposera "1 boîte" plutôt qu'un nombre d'unités.
+    <div class="alert alert-blue" style="margin-bottom:14px;line-height:1.7">
+      📦 <strong>RÈGLE TAILLE BOÎTE — à relire en cas de doute !</strong>
+      <div style="margin-top:10px;padding:10px 12px;background:rgba(255,255,255,.6);border-radius:6px;margin-bottom:8px">
+        <strong>① Cas standard (la majorité des articles)</strong><br>
+        Stock = nombre de <strong>pièces</strong> · Mini = seuil en <strong>pièces</strong> · Taille boîte = <strong>1</strong><br>
+        <em style="color:#555">Ex : Compresses, Fils, Gants latex...</em>
+      </div>
+      <div style="padding:10px 12px;background:rgba(255,255,255,.6);border-radius:6px;margin-bottom:8px">
+        <strong>② Cas "on compte en boîtes entières"</strong><br>
+        Stock = nombre de <strong>boîtes</strong> · Mini = nombre de <strong>boîtes</strong> voulues · Taille boîte = <strong>1</strong> (même si le nom dit "boîte de 100" !)<br>
+        <em style="color:#555">Ex : Abaisse-langue, Gants nitryle S/M/L</em>
+      </div>
+      <div style="padding:10px 12px;background:rgba(255,255,255,.6);border-radius:6px">
+        <strong>③ Cas "boîte avec calcul automatique"</strong><br>
+        Stock = nombre de <strong>pièces réelles</strong> · Mini = pièces pour "X boîtes pleines" (ex: 100 = 1 boîte) · Taille boîte = <strong>la vraie taille</strong> (ex: 100)<br>
+        <em style="color:#555">Ex : Seringues, Aiguilles</em>
+      </div>
     </div>
     <div class="search-wrap"><input type="text" id="s-params" placeholder="Rechercher..." oninput="drawParams()"></div>
     <div class="tbl-wrap">
