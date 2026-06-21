@@ -274,12 +274,16 @@ video { width: 100%; height: 100%; object-fit: cover; display: block; }
 
 <!-- COMMANDE -->
 <div id="page-commande" class="page">
+  <div class="onglets no-print" style="margin-bottom:14px">
+    <button class="onglet on" id="cmd-tab-materiel" onclick="setCommandeType('materiel')">📦 Tintigny</button>
+    <button class="onglet off" id="cmd-tab-medicament" onclick="setCommandeType('medicament')">💊 Pharmacie</button>
+  </div>
   <div id="cmd-ok" class="alert alert-green">✅ Tout le stock est correct. Aucune commande nécessaire.</div>
   <div id="cmd-content" style="display:none">
-    <div class="alert alert-red">⚠️ Ces articles sont sous le stock minimum. À commander à PMGLD Tintigny.</div>
+    <div class="alert alert-red" id="cmd-alert-text">⚠️ Ces articles sont sous le stock minimum. À commander à PMGLD Tintigny.</div>
     <div class="card">
       <div class="flex-row">
-        <h2>🛒 Bon de commande — Bièvre → Tintigny</h2>
+        <h2 id="cmd-title">🛒 Bon de commande — Bièvre → Tintigny</h2>
         <button class="btn btn-blue btn-sm no-print" onclick="exportCmd()">📥 Exporter Excel</button>
       </div>
       <div id="cmd-list"></div>
@@ -10896,8 +10900,20 @@ function saveParams() {
 }
 
 // ── COMMANDE ──
+var _commandeType = 'materiel';
+function setCommandeType(t) {
+  _commandeType = t;
+  document.getElementById('cmd-tab-materiel').classList.toggle('on', t==='materiel');
+  document.getElementById('cmd-tab-materiel').classList.toggle('off', t!=='materiel');
+  document.getElementById('cmd-tab-medicament').classList.toggle('on', t==='medicament');
+  document.getElementById('cmd-tab-medicament').classList.toggle('off', t!=='medicament');
+  document.getElementById('cmd-title').textContent = t==='medicament' ? '🛒 Bon de commande — Bièvre → Pharmacie' : '🛒 Bon de commande — Bièvre → Tintigny';
+  document.getElementById('cmd-alert-text').textContent = t==='medicament' ? '⚠️ Ces médicaments sont sous le stock minimum. À commander à la Pharmacie de Bièvre.' : '⚠️ Ces articles sont sous le stock minimum. À commander à PMGLD Tintigny.';
+  drawCommande();
+}
+
 function drawCommande() {
-  var arts = getArts();
+  var arts = getArts().filter(function(a) { return getType(a) === _commandeType; });
   var low = arts.filter(function(a) { return a.stock < a.mini; });
   document.getElementById('cmd-ok').style.display = low.length ? 'none' : '';
   document.getElementById('cmd-content').style.display = low.length ? '' : 'none';
@@ -10928,10 +10944,16 @@ function drawCommande() {
 
 
 
-var APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxKr_I_oLCyfi-2lNqkjnnMveDcfwtZf1Um8_bhRqqhJYrfas79-vP7mL898MD6mQ9tMg/exec";
+var APPS_SCRIPT_URL_TINTIGNY = "https://script.google.com/macros/s/AKfycbxKr_I_oLCyfi-2lNqkjnnMveDcfwtZf1Um8_bhRqqhJYrfas79-vP7mL898MD6mQ9tMg/exec";
+var APPS_SCRIPT_URL_PHARMACIE = "https://script.google.com/macros/s/AKfycbxa7z8sut2LgPVJlYILMJt2n_6zOGK0FKT6rzHkiWogdX5pEoXE-h5Wcmqey2lhJ-5G/exec";
 
 function exportCmd() {
-  var arts = getArts();
+  var scriptUrl = _commandeType === 'medicament' ? APPS_SCRIPT_URL_PHARMACIE : APPS_SCRIPT_URL_TINTIGNY;
+  if (_commandeType === 'medicament' && scriptUrl.indexOf('COLLER_ICI') === 0) {
+    alert('Le bon de commande Pharmacie n\'est pas encore configuré.\nContactez Claude/le développeur pour finaliser cette étape.');
+    return;
+  }
+  var arts = getArts().filter(function(a) { return getType(a) === _commandeType; });
   var stocks = {};
   arts.forEach(function(a) { stocks[a.nom] = a.stock; });
 
@@ -10956,7 +10978,7 @@ function exportCmd() {
     }
   };
 
-  var url = APPS_SCRIPT_URL
+  var url = scriptUrl
     + '?action=generer'
     + '&callback=' + callbackName
     + '&stocks=' + encodeURIComponent(JSON.stringify(stocks));
