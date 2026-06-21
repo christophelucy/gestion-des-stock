@@ -143,6 +143,10 @@ video { width: 100%; height: 100%; object-fit: cover; display: block; }
       <h2>📦 Armoire Bièvre</h2>
       <button class="btn btn-green btn-sm no-print" onclick="openAdd()">➕ Ajouter</button>
     </div>
+    <div class="onglets no-print" style="margin-bottom:12px">
+      <button class="onglet on" id="stk-tab-materiel" onclick="setStockType('materiel')">📦 Matériel</button>
+      <button class="onglet off" id="stk-tab-medicament" onclick="setStockType('medicament')">💊 Médicaments</button>
+    </div>
     <div class="search-wrap"><input type="text" id="s-stock" placeholder="Rechercher..." oninput="drawStock()"></div>
     <div class="tbl-wrap">
       <table>
@@ -378,6 +382,10 @@ video { width: 100%; height: 100%; object-fit: cover; display: block; }
         <em style="color:#555">Ex : Seringues, Aiguilles</em>
       </div>
     </div>
+    <div class="onglets no-print" style="margin-bottom:12px">
+      <button class="onglet on" id="prm-tab-materiel" onclick="setParamsType('materiel')">📦 Matériel</button>
+      <button class="onglet off" id="prm-tab-medicament" onclick="setParamsType('medicament')">💊 Médicaments</button>
+    </div>
     <div class="search-wrap"><input type="text" id="s-params" placeholder="Rechercher..." oninput="drawParams()"></div>
     <div class="tbl-wrap">
       <table>
@@ -401,6 +409,12 @@ video { width: 100%; height: 100%; object-fit: cover; display: block; }
 <div class="overlay" id="m-add">
   <div class="modal">
     <h2>➕ Ajouter un article</h2>
+    <div class="form-row"><label>Type</label>
+      <select id="add-type">
+        <option value="materiel">📦 Matériel (Tintigny)</option>
+        <option value="medicament">💊 Médicament (Pharmacie)</option>
+      </select>
+    </div>
     <div class="form-row"><label>Désignation *</label><input type="text" id="add-nom" placeholder="Nom de l'article"></div>
     <div class="form-row"><label>Stock actuel</label><input type="number" id="add-stock" value="0" min="0"></div>
     <div class="form-row"><label>Stock minimum</label><input type="number" id="add-mini" value="10" min="0"></div>
@@ -10620,6 +10634,8 @@ window._currentPage = 'Stock';
 
 function getArts() { return window._arts || []; }
 
+function getType(a) { return a.type === 'medicament' ? 'medicament' : 'materiel'; }
+
 function findArt(id) {
   return getArts().find(function(a) { return a.id === id; });
 }
@@ -10661,8 +10677,18 @@ function nav(btn, page) {
 }
 
 // ── STOCK ──
+var _stockType = 'materiel';
+function setStockType(t) {
+  _stockType = t;
+  document.getElementById('stk-tab-materiel').classList.toggle('on', t==='materiel');
+  document.getElementById('stk-tab-materiel').classList.toggle('off', t!=='materiel');
+  document.getElementById('stk-tab-medicament').classList.toggle('on', t==='medicament');
+  document.getElementById('stk-tab-medicament').classList.toggle('off', t!=='medicament');
+  drawStock();
+}
+
 function drawStock() {
-  var arts = getArts();
+  var arts = getArts().filter(function(a) { return getType(a) === _stockType; });
   var f = (document.getElementById('s-stock').value || '').toLowerCase();
   var tbody = document.getElementById('tbody-stock');
   var n_cmd=0, n_rup=0, n_ok=0;
@@ -10709,13 +10735,14 @@ function openAdd() {
   document.getElementById('add-nom').value = '';
   document.getElementById('add-stock').value = '0';
   document.getElementById('add-mini').value = '10';
+  document.getElementById('add-type').value = 'materiel';
   document.getElementById('m-add').classList.add('on');
   setTimeout(function() { document.getElementById('add-nom').focus(); }, 100);
 }
 function confirmAdd() {
   var nom = document.getElementById('add-nom').value.trim();
   if (!nom) { alert('Entrez une désignation.'); return; }
-  var art = { id: nextId(), nom: nom, stock: parseInt(document.getElementById('add-stock').value)||0, mini: parseInt(document.getElementById('add-mini').value)||0 };
+  var art = { id: nextId(), nom: nom, stock: parseInt(document.getElementById('add-stock').value)||0, mini: parseInt(document.getElementById('add-mini').value)||0, type: document.getElementById('add-type').value, taillebte: 1 };
   fbSave(art);
   closeModal();
   showOK('Article ajouté !', '"' + nom + '" a été ajouté et sera visible sur tous les appareils.');
@@ -10786,10 +10813,19 @@ function showOK(t, m) { document.getElementById('ok-title').textContent=t; docum
 
 // ── PARAMS ──
 var _paramsChanges = {}; // stocke les modifs en attente
+var _paramsType = 'materiel';
+function setParamsType(t) {
+  _paramsType = t;
+  document.getElementById('prm-tab-materiel').classList.toggle('on', t==='materiel');
+  document.getElementById('prm-tab-materiel').classList.toggle('off', t!=='materiel');
+  document.getElementById('prm-tab-medicament').classList.toggle('on', t==='medicament');
+  document.getElementById('prm-tab-medicament').classList.toggle('off', t!=='medicament');
+  drawParams();
+}
 
 function drawParams() {
   _paramsChanges = {};
-  var arts = getArts();
+  var arts = getArts().filter(function(a) { return getType(a) === _paramsType; });
   var f = (document.getElementById('s-params').value || '').toLowerCase();
   var tbody = document.getElementById('tbody-params');
   tbody.innerHTML = '';
